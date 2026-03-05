@@ -1,0 +1,395 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Cipher Wheel – Center Fade Version</title>
+<style>
+
+body{
+margin:0;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+height:100vh;
+font-family:serif;
+background:radial-gradient(circle,#182028 0%,#0f1419 70%);
+color:white;
+transition:background 1s;
+overflow:hidden;
+}
+
+body.awakened-life{ background:radial-gradient(circle,#0f2a14 0%,#07140a 70%,#000); }
+body.awakened-sun{ background:radial-gradient(circle,#5a3e00 0%,#2a1c00 70%,#000); }
+body.awakened-blood{ background:radial-gradient(circle,#3b0000 0%,#1a0000 70%,#000); }
+body.awakened-infernal{ background:radial-gradient(circle,#2a0000 0%,#120000 70%,#000); }
+
+canvas{
+border-radius:50%;
+box-shadow:0 0 60px rgba(0,0,0,0.8);
+}
+
+/* LIFE */
+body.awakened-life canvas{
+box-shadow:0 0 100px rgba(0,255,120,0.7);
+}
+
+/* SUN */
+body.awakened-sun canvas{
+box-shadow:0 0 120px rgba(255,210,0,0.9);
+}
+
+/* BLOOD */
+@keyframes bloodPulse{
+0%{box-shadow:0 0 40px rgba(120,0,0,0.5)}
+50%{box-shadow:0 0 140px rgba(255,0,0,1)}
+100%{box-shadow:0 0 40px rgba(120,0,0,0.5)}
+}
+body.awakened-blood canvas{
+animation:bloodPulse 2.2s infinite;
+}
+
+/* INFERNAL */
+@keyframes infernalGlow{
+0%{box-shadow:0 0 20px rgba(255,80,0,0.3)}
+50%{box-shadow:0 0 60px rgba(255,80,0,0.6)}
+100%{box-shadow:0 0 20px rgba(255,80,0,0.3)}
+}
+body.awakened-infernal canvas{
+animation:infernalGlow 6s infinite;
+}
+
+.controls{
+margin-top:20px;
+text-align:center;
+}
+
+input,button{
+padding:10px;
+margin:6px;
+font-size:16px;
+}
+
+.hidden{display:none;}
+
+</style>
+</head>
+<body>
+
+<canvas id="wheel" width="800" height="800"></canvas>
+
+<div class="controls">
+
+<input type="password" id="passwordInput" placeholder="Enter sacred word">
+<button onclick="unlock()">Unlock</button>
+
+<div id="cipherSection" class="hidden">
+
+<input type="text" id="inputText" placeholder="Enter message..."><br>
+
+<button onclick="processText('encrypt')">Encrypt</button>
+<button onclick="processText('decrypt')">Decrypt</button>
+
+<div id="outputText"></div>
+
+</div>
+
+</div>
+
+<script>
+
+const canvas=document.getElementById("wheel");
+const ctx=canvas.getContext("2d");
+
+const latin="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+const elven=["ᚨ","ᛒ","ᚲ","ᛞ","ᛖ","ᚠ","ᚷ","ᚺ","ᛁ","ᛃ","ᚲ","ᛚ","ᛗ","ᚾ","ᛟ","ᛈ","ᛩ","ᚱ","ᛊ","ᛏ","ᚢ","ᚡ","ᚹ","ᛪ","ᚤ","ᛉ"];
+const hiero=["𓂀","𓃀","𓆣","𓅓","𓇋","𓆑","𓎼","𓉔","𓇋","𓆓","𓎡","𓃭","𓅓","𓈖","𓂝","𓊪","𓋴","𓂋","𓋴","𓏏","𓅱","𓆑","𓅱","𓎡","𓇌","𓊃"];
+const greek=["Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω","Ϝ","Ϙ"];
+const occult=["⛧","☠","⚚","⚸","☥","☣","☤","🜏","🜍","⚕","☾","☽","♄","♇","⟁","✶","⚶","⚴","⚵","🜔","🜍","🜚","🜓","🜃","🜄","🜁"];
+
+const STEP = 2*Math.PI/26;
+
+/* Start with F under pointer */
+let outerRotation = -5 * STEP;
+let innerRotation = 13 * STEP;
+
+let outerAlphabet=elven;
+let theme="life";
+
+const center=400;
+
+let awakened=false;
+
+let draggingOuter=false;
+let draggingInner=false;
+
+function outerAligned(){
+let rot = outerRotation % (2*Math.PI);
+if(rot<0) rot+=2*Math.PI;
+return rot < 0.05 || rot > (2*Math.PI-0.05);
+}
+
+function innerAligned(){
+let rot = innerRotation % (2*Math.PI);
+if(rot<0) rot+=2*Math.PI;
+return rot < 0.05 || rot > (2*Math.PI-0.05);
+}
+
+function draw(){
+
+ctx.clearRect(0,0,800,800);
+
+if(!awakened){
+
+ctx.beginPath();
+ctx.arc(center,center,360,0,Math.PI*2);
+ctx.fillStyle="#2a2f36";
+ctx.fill();
+return;
+
+}
+
+let color="#00ff88";
+if(theme==="sun") color="#ffd700";
+if(theme==="blood") color="#ff3333";
+if(theme==="infernal") color="#ff5500";
+
+drawDisk(320,360,outerAlphabet,outerRotation,color,true);
+drawDisk(200,240,latin,innerRotation,"#ffffff",false);
+
+drawCenterSymbol();
+drawPointer();
+
+}
+
+function drawPointer(){
+
+ctx.save();
+ctx.globalAlpha=0.5;
+
+ctx.beginPath();
+ctx.moveTo(center,10);
+ctx.lineTo(center-7,28);
+ctx.lineTo(center+7,28);
+ctx.closePath();
+
+ctx.fillStyle="white";
+ctx.fill();
+
+ctx.restore();
+
+}
+
+function drawCenterSymbol(){
+
+let alpha = innerAligned() ? 1 : 0.15;
+
+ctx.save();
+ctx.globalAlpha = alpha;
+
+ctx.font="120px serif";
+ctx.textAlign="center";
+ctx.textBaseline="middle";
+
+if(theme==="life"){ ctx.fillStyle="#66ffcc"; ctx.fillText("ᛟ",center,center); }
+if(theme==="sun"){ ctx.fillStyle="#ffd700"; ctx.fillText("☀",center,center); }
+if(theme==="blood"){ ctx.fillStyle="#ff3333"; ctx.fillText("🜏",center,center); }
+if(theme==="infernal"){ ctx.fillStyle="#ff5500"; ctx.fillText("⛧",center,center); }
+
+ctx.restore();
+
+}
+
+function drawDisk(innerR,outerR,alphabet,rotation,color,isOuter){
+
+ctx.save();
+ctx.translate(center,center);
+ctx.rotate(rotation);
+
+const step=2*Math.PI/26;
+
+const glowActive=outerAligned();
+
+for(let i=0;i<26;i++){
+
+const angle=i*step-Math.PI/2;
+
+const x=Math.cos(angle)*((innerR+outerR)/2);
+const y=Math.sin(angle)*((innerR+outerR)/2);
+
+ctx.save();
+ctx.translate(x,y);
+ctx.rotate(angle+Math.PI/2);
+
+ctx.font="24px serif";
+ctx.textAlign="center";
+ctx.textBaseline="middle";
+
+if(glowActive && isOuter){
+ctx.shadowColor=color;
+ctx.shadowBlur=25;
+ctx.fillStyle=color;
+}else{
+ctx.shadowBlur=0;
+ctx.fillStyle=color;
+}
+
+ctx.fillText(alphabet[i],0,0);
+
+ctx.restore();
+
+}
+
+if(glowActive && isOuter){
+
+for(let i=0;i<26;i++){
+
+const angle=(i+0.5)*step-Math.PI/2;
+
+const x=Math.cos(angle)*(outerR-12);
+const y=Math.sin(angle)*(outerR-12);
+
+ctx.beginPath();
+ctx.arc(x,y,3,0,Math.PI*2);
+
+ctx.fillStyle=color;
+ctx.shadowColor=color;
+ctx.shadowBlur=18;
+
+ctx.fill();
+
+}
+
+}
+
+ctx.beginPath();
+ctx.arc(0,0,outerR,0,Math.PI*2);
+ctx.strokeStyle=color+"55";
+ctx.lineWidth=3;
+ctx.stroke();
+
+ctx.restore();
+
+}
+
+function getAngle(x,y){
+return Math.atan2(y-center,x-center);
+}
+
+canvas.addEventListener("mousedown",e=>{
+
+if(!awakened)return;
+
+const r=canvas.getBoundingClientRect();
+const x=e.clientX-r.left;
+const y=e.clientY-r.top;
+
+const d=Math.hypot(x-center,y-center);
+
+if(d>280) draggingOuter=true;
+else if(d>160) draggingInner=true;
+
+});
+
+canvas.addEventListener("mousemove",e=>{
+
+if(!awakened || (!draggingOuter && !draggingInner)) return;
+
+const r=canvas.getBoundingClientRect();
+const x=e.clientX-r.left;
+const y=e.clientY-r.top;
+
+const a=getAngle(x,y);
+
+if(draggingOuter) outerRotation=a;
+if(draggingInner) innerRotation=a;
+
+draw();
+
+});
+
+canvas.addEventListener("mouseup",()=>{
+draggingOuter=false;
+draggingInner=false;
+});
+
+canvas.addEventListener("mouseleave",()=>{
+draggingOuter=false;
+draggingInner=false;
+});
+
+function unlock(){
+
+const pass=document.getElementById("passwordInput").value;
+
+if(pass==="yasam"){
+outerAlphabet=elven;
+theme="life";
+document.body.className="awakened-life";
+}
+
+else if(pass==="gunes"){
+outerAlphabet=hiero;
+theme="sun";
+document.body.className="awakened-sun";
+}
+
+else if(pass==="kan"){
+outerAlphabet=greek;
+theme="blood";
+document.body.className="awakened-blood";
+}
+
+else if(pass==="iskence"){
+outerAlphabet=occult;
+theme="infernal";
+document.body.className="awakened-infernal";
+}
+
+else{
+alert("The temple rejects you...");
+return;
+}
+
+awakened=true;
+
+document.getElementById("cipherSection").classList.remove("hidden");
+
+draw();
+
+}
+
+function processText(mode){
+
+const input=document.getElementById("inputText").value.toUpperCase();
+
+const step=Math.round((innerRotation-outerRotation)/(2*Math.PI/26));
+
+let result="";
+
+for(let c of input){
+
+let i=latin.indexOf(c);
+
+if(i===-1){
+result+=c;
+continue;
+}
+
+let ni=(mode==="encrypt")?(i+step+26)%26:(i-step+26)%26;
+
+result+=latin[ni];
+
+}
+
+document.getElementById("outputText").innerText=result;
+
+}
+
+draw();
+
+</script>
+</body>
+</html>
